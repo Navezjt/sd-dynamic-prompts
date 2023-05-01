@@ -16,7 +16,7 @@ from modules import devices
 from modules.processing import fix_seed
 from modules.shared import opts
 
-from sd_dynamic_prompts import callbacks
+from sd_dynamic_prompts import __version__, callbacks
 from sd_dynamic_prompts.element_ids import make_element_id
 from sd_dynamic_prompts.generator_builder import GeneratorBuilder
 from sd_dynamic_prompts.helpers import (
@@ -28,7 +28,7 @@ from sd_dynamic_prompts.helpers import (
 from sd_dynamic_prompts.pnginfo_saver import PngInfoSaver
 from sd_dynamic_prompts.prompt_writer import PromptWriter
 
-VERSION = "2.10.3"
+VERSION = __version__
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -380,6 +380,7 @@ class Script(scripts.Script):
         self._pnginfo_saver.enabled = opts.dp_write_raw_template
         self._prompt_writer.enabled = opts.dp_write_prompts_to_file
         self._limit_jinja_prompts = opts.dp_limit_jinja_prompts
+        self._auto_purge_cache = opts.dp_auto_purge_cache
         magicprompt_batch_size = opts.dp_magicprompt_batch_size
 
         parser_config = ParserConfig(
@@ -401,6 +402,8 @@ class Script(scripts.Script):
                 num_images = max_generations
 
         combinatorial_batches = int(combinatorial_batches)
+        if self._auto_purge_cache:
+            self._wildcard_manager.clear_cache()
 
         try:
             logger.debug("Creating generator")
@@ -462,7 +465,13 @@ class Script(scripts.Script):
         updated_count = len(all_prompts)
         p.n_iter = math.ceil(updated_count / p.batch_size)
 
-        p.all_seeds, p.all_subseeds = get_seeds(p, updated_count, use_fixed_seed)
+        p.all_seeds, p.all_subseeds = get_seeds(
+            p,
+            updated_count,
+            use_fixed_seed,
+            is_combinatorial,
+            combinatorial_batches,
+        )
 
         logger.info(
             f"Prompt matrix will create {updated_count} images in a total of {p.n_iter} batches.",
